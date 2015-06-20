@@ -1,11 +1,24 @@
 #!/bin/bash
 #
+# Copyright 2015 SmartX Collaboration (GIST NetCS). All rights reserved.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#
 # Name			: smartx_bstar_installation.sh
 # Description	: Script for installing nad Configuring OpenStack and SDN Open vSwitch Bridges 
 #
 # Created by    : TEIN_GIST@nm.gist.ac.kr
 # Version       : 0.1
-# Last Update	: April, 2015
+# Last Update	: June, 2015
 #
 
 # Specific Parameter
@@ -17,8 +30,9 @@ BR2_DPID=1111111111111102
 BRCAP_DPID=3333333333333301
 DP_IF=eth5
 DP_GW=61.252.52.1
+HUB=GIST
 
-# Copy the source of OpenStack through DevStack for Juno STable Release
+# Copy the source of OpenStack through DevStack for Juno Stable Release
 
 start=$(date +"%s")
 echo Installation Start at `date +"%r"`
@@ -100,8 +114,8 @@ fi
  
 
 
-#ADDING THE BRIDGE (WITH BR1 AND BR2) - COMMON
-#=============================================
+# ADDING THE BRIDGE (WITH BR1 AND BR2) - COMMON
+# =============================================
 
 echo "Configuring SDN Open vSwitch Bridges common configuration"
 sleep 2
@@ -154,25 +168,46 @@ ovs-vsctl set Interface C_MYREN type=patch
 ovs-vsctl set Interface C_MYREN options:peer=MYREN
 
 
-#SET OVERLAY VXLAN PORTS TO MYREN
-#=================================
+# SET OVERLAY VXLAN PORTS TO MYREN
+# =================================
 
 echo "Configuring Route and Overlay Network"
 sleep 2
 
-route add -net 61.252.52.0/24 gw $DP_GW dev $DP_IF
-route add -host 103.26.47.229/32 gw $DP_GW dev $DP_IF
+if [ $HUB = "GIST" ]; then
+	echo "Route and Overlay Network to GIST site"
 
-# Add VXLAN port 
-ovs-vsctl add-port brcap ovs_vxlan_MYREN
-ovs-vsctl set Interface ovs_vxlan_MYREN type=vxlan
-ovs-vsctl set Interface ovs_vxlan_MYREN options:remote_ip=103.26.47.229
+	# Add Route
+	route add -net 61.252.52.0/24 gw $DP_GW dev $DP_IF
 
-echo "Setting the Datapath ID and Controller Information"
-sleep 2
+	# Add VXLAN port 
+	ovs-vsctl add-port brcap ovs_vxlan_GIST
+	ovs-vsctl set Interface ovs_vxlan_GIST type=vxlan
+	ovs-vsctl set Interface ovs_vxlan_GIST options:remote_ip=61.252.52.11
 
-#SET DATAPATH ID AND CONTROLLER WITH FLOWVISOR
-#=============================================
+	echo "Setting the Datapath ID and Controller Information"
+	sleep 2
+
+												
+elif [ $HUB = "MYREN" ]; then
+	echo "Route and Overlay Network to MYREN site"
+	
+	# Add Route
+	route add -host 103.26.47.229/32 gw $DP_GW dev $DP_IF
+
+	# Add VXLAN port 
+	ovs-vsctl add-port brcap ovs_vxlan_MYREN
+	ovs-vsctl set Interface ovs_vxlan_MYREN type=vxlan
+	ovs-vsctl set Interface ovs_vxlan_MYREN options:remote_ip=103.26.47.229
+
+	echo "Setting the Datapath ID and Controller Information"
+	sleep 2
+	
+fi
+
+
+# SET DATAPATH ID AND CONTROLLER WITH FLOWVISOR
+# =============================================
 
 # Set datapath ID
 ovs-vsctl set bridge br1 other-config:datapath-id=$BR1_DPID
@@ -183,7 +218,7 @@ ovs-vsctl set-controller br1 tcp:103.22.221.52:6633
 ovs-vsctl set-controller br2 tcp:103.22.221.52:6633
 ovs-vsctl set-controller brcap tcp:103.22.221.152:6633
 
-# Calculate the installation tine duration
+# Calculate the installation time duration
 
 stop=$(date +"%s")
 echo Installation Finish at `date +"%r"`
